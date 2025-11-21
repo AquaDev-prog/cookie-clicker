@@ -131,7 +131,7 @@ def submit_form():
     if request.method == 'POST':
         username = request.form['username'].strip()
         path = os.path.join("users", f"login_save_{username}.json")
-        if os.path.exists(path) == True:
+        if os.path.exists(path):
             error_message = "Username already exists!"
             error_message_status = True
             return render_template('sign_up.html',
@@ -192,9 +192,9 @@ def log_in():
         email_json = read_save.get("email")
         if read_save is None:
             error_status = True
-            error_message - "This user does not exist"
+            error_message = "This user does not exist"
             return render_template('log_in.html', error_message=error_message, error_status=error_status)
-        elif check_password_hash(password_json, password) == password and email_json == email:
+        elif check_password_hash(password_json, password) and email_json == email:
             session['username'] = username
 
             job_id = f"autoclick_{username}"
@@ -340,6 +340,9 @@ def get_score():
 
     save = apply_autoclick(username)
     upgrades = read_upgrades_func(username)
+
+    if save is None or upgrades is None:
+        return {"score": 0, "cps": 0, "click_worth": 1}
 
     return {
         "score": save.get("clicks", 0),
