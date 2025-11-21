@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('start') }}">
+            <button class="menu-button">Main Menu</button>
+        </a>
+    </div>
+
+    <div class="center-container">
+        <h1>Sign Up</h1>
+        <p>Please enter your information</p>
+
+        <form action="{{ url_for('submit_form') }}" method="POST">
+            <div>
+                <input type="text" name="username" placeholder="Username" required>
+            </div>
+            <div>
+                <input type="password" name="password" placeholder="Password" required>
+            </div>
+            <div>
+                <input type="password" name="verify" placeholder="Verify Password" required>
+            </div>
+            <div>
+                <input type="email" name="email" placeholder="Email" required>
+            </div>
+            <div>
+                <button type="submit">Sign Up</button>
+            </div>
+
+            {% if error_message_status %}
+                <div class="error-message">
+                    <p>{{ error_message }}</p>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+
+</body>
+</html>
+

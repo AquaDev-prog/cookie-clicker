@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade Shop</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('homepage') }}">
+            <button class="menu-button">Back to Game</button>
+        </a>
+    </div>
+
+    <div class="shop-container">
+        <h1>Upgrade Shop</h1>
+        <p>Your current score: {{ score }}</p>
+
+        <!-- Click Worth Upgrade -->
+        <div class="upgrade-item">
+            <h2>Click Worth</h2>
+            <p>Increase how much each click gives you.</p>
+            <p>Price: {{ click_worth_price }}</p>
+            <form method="POST">
+                <button type="submit" name="buy_click_worth">Buy Click Worth</button>
+            </form>
+        </div>
+
+        <!-- Autoclick Upgrade -->
+        <div class="upgrade-item">
+            <h2>Autoclick</h2>
+            <p>Automatically gain clicks every second.</p>
+            <p>Price: {{ autoclick_price }}</p>
+            <form method="POST">
+                <button type="submit" name="buy_autoclick">Buy Autoclick</button>
+            </form>
+        </div>
+
+        {% if error_status %}
+            <div class="error-message">
+                <p>{{ error_message }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+</body>
+</html>

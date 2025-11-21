@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log In</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('start') }}">
+            <button class="menu-button">Main Menu</button>
+        </a>
+    </div>
+
+    <div class="center-container">
+        <h1>Log In</h1>
+        <p>Please enter your information</p>
+
+        <form action="{{ url_for('log_in') }}" method="POST">
+            <div>
+                <input type="text" name="username" placeholder="Username" required>
+            </div>
+            <div>
+                <input type="password" name="password" placeholder="Password" required>
+            </div>
+            <div>
+                <input type="email" name="email" placeholder="Email" required>
+            </div>
+            <div>
+                <button type="submit">Log In</button>
+            </div>
+
+            {% if error_status %}
+                <div class="error-message">
+                    <p>{{ error_message }}</p>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+
+</body>
+</html>
+

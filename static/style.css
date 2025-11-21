@@ -1,0 +1,182 @@
+/* ===========================
+   GLOBAL RESET + BASICS
+   =========================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #f5f5f5;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    color: #333;
+}
+
+/* ===========================
+     TOP SCORE + HEADER TEXT
+   =========================== */
+#scoreDisplay {
+    font-size: 40px;
+    font-weight: bold;
+    color: #222;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+}
+
+#cpsDisplay,
+#clickWorthDisplay {
+    font-size: 22px;
+    color: #444;
+    position: absolute;
+    left: 20px;
+}
+
+#cpsDisplay {
+    top: 70px;
+}
+
+#clickWorthDisplay {
+    top: 110px;
+}
+
+/* ===========================
+          COOKIE BUTTON
+   =========================== */
+.cookie-button {
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    border: none;
+    background-image: url("/static/images/cookie.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: transparent;
+    cursor: pointer;
+
+    /* Click animation */
+    transition: transform 0.1s ease;
+}
+
+.cookie-button:active {
+    transform: scale(0.92);
+    background-color: transparent;
+}
+
+/* ===========================
+       SHOP + MENU BUTTONS
+   =========================== */
+.menu-button,
+.shop-button,
+.logout-button {
+    padding: 12px 25px;
+    font-size: 18px;
+    background-color: #0078ff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 10px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.menu-button:hover,
+.shop-button:hover,
+.logout-button:hover {
+    background-color: #005fcc;
+}
+
+.menu-button:active,
+.shop-button:active,
+.logout-button:active {
+    transform: scale(0.96);
+}
+
+/* ===========================
+             SHOP UI
+   =========================== */
+.shop-container {
+    margin-top: 120px;
+    padding: 20px;
+}
+
+.upgrade-item {
+    background-color: white;
+    width: 350px;
+    margin: 20px auto;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 8px rgba(0,0,0,0.15);
+}
+
+.upgrade-item button {
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #ffa700;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.upgrade-item button:hover {
+    background-color: #d68d00;
+}
+
+.upgrade-item button:active {
+    transform: scale(0.95);
+}
+
+/* Error message styling */
+.error-message {
+    color: red;
+    font-size: 18px;
+    margin-top: 10px;
+}
+
+/* ===========================
+      SIGN UP + LOGIN FORMS
+   =========================== */
+form input {
+    padding: 10px;
+    width: 250px;
+    margin: 10px 0;
+    font-size: 16px;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+}
+
+form button {
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+form button:hover {
+    background-color: transparent;
+}
+
+form button:active {
+    transform: scale(0.96);
+}
+
+/* ====================================
+   PAGE CENTERING (for login + sign up)
+   ==================================== */
+.center-container {
+    margin-top: 150px;
+}
+
+/* ===========================
+      BACKGROUND LAYOUT FIX
+   =========================== */
+html, body {
+    height: 100%;
+}

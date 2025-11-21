@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="center-container">
+        <h1>Welcome to Cookie Clicker</h1>
+        <p>Choose a sign in option</p>
+
+        <div style="margin-top: 30px;">
+            <a href="{{ url_for('log_in') }}">
+                <button class="menu-button">Log In</button>
+            </a>
+
+            <a href="{{ url_for('submit_form') }}">
+                <button class="menu-button">Sign Up</button>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
+

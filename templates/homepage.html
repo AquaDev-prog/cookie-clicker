@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Clicker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Score display -->
+    <h1 id="scoreDisplay">
+        Score: {{ score }}
+    </h1>
+
+    <!-- Top-right buttons -->
+    <div style="position: absolute; top: 20px; right: 20px;">
+        <a href="{{ url_for('upgrade_shop') }}">
+            <button class="shop-button">Upgrades</button>
+        </a>
+
+        <a href="{{ url_for('logout') }}">
+            <button class="logout-button">Logout</button>
+        </a>
+    </div>
+    <div id="leaderboardBox">
+        <h3>Top Players</h3>
+        <ul id="leaderboardList"></ul>
+    </div>
+    <!-- Big cookie center -->
+    <div style="display: flex; align-items: center; justify-content: center; height: 100vh;">
+        <form method="POST">
+            <button class="cookie-button" type="submit" name="cookie"></button>
+        </form>
+    </div>
+
+    <!-- Auto-refresh score via JS -->
+    <script>
+    setInterval(() => {
+        fetch('/get_score')
+            .then(response => response.json())
+            .then(data => {
+                const scoreEl = document.getElementById('scoreDisplay');
+                if (scoreEl) {
+                    scoreEl.innerText = "Score: " + data.score;
+                }
+            })
+            .catch(err => console.error('Error fetching score:', err));
+    }, 1000);
+    </script>
+    <script>
+    function updateLeaderboard() {
+        fetch('/get_leaderboard')
+            .then(response => response.json())
+            .then(data => {
+                const list = document.getElementById('leaderboardList');
+                list.innerHTML = "";
+
+                data.players.forEach((player, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${index + 1}. ${player.username} - ${player.score}`;
+                    list.appendChild(li);
+                });
+            });
+    }
+    // Update leaderboard every 14 minutes
+    setInterval(updateLeaderboard, 840000);
+    updateLeaderboard();
+    </script>
+
+</body>
+</html>
