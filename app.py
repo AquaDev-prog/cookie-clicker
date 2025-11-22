@@ -1,364 +1,374 @@
-from flask import Flask, request, render_template, redirect, url_for, session
-import json
 import os
-import random
-import string
-from flask_apscheduler import APScheduler
+from datetime import datetime
+
+from flask import (
+    Flask,
+    request,
+    render_template,
+    redirect,
+    url_for,
+    session,
+)
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# ---------------------------------------------------
+# Flask + Database config
+# ---------------------------------------------------
 app = Flask(__name__)
-app.secret_key = "hua7y6s7u847yr80dsibjyg293wisxib0shf"
+app.secret_key = "hua7y6s7u847yr80dsibjyg293wisxib0shf"  # change this in real life
 
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
+# DATABASE_URL from env (Render) or local SQLite for development
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///local_dev.db")
+
+# Some providers use postgres://, SQLAlchemy wants postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
+
+
+# ---------------------------------------------------
+# Models
+# ---------------------------------------------------
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    clicks = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    upgrade = db.relationship("Upgrade", backref="user", uselist=False)
+
+
+class Upgrade(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+
+    click_worth_value = db.Column(db.Integer, default=1, nullable=False)
+    autoclick_value = db.Column(db.Integer, default=0, nullable=False)
+    click_worth_price = db.Column(db.Integer, default=2, nullable=False)
+    autoclick_price = db.Column(db.Integer, default=10, nullable=False)
+
+
+# ---------------------------------------------------
+# Helper functions
+# ---------------------------------------------------
+def get_user_by_username(username: str):
+    return User.query.filter_by(username=username).first()
+
+
+def get_logged_in_user():
+    """Return User object from session username or None. Clears stale sessions."""
+    username = session.get("username")
+    if not username:
+        return None
+    user = get_user_by_username(username)
+    if user is None:
+        session.clear()
+        return None
+    return user
+
+
+def create_user(username: str, email: str, password: str):
+    hashed_pw = generate_password_hash(password)
+    user = User(
+        username=username,
+        email=email,
+        password_hash=hashed_pw,
+        clicks=0,
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    # Create default upgrades row
+    upgrade = Upgrade(
+        user_id=user.id,
+        click_worth_value=1,
+        autoclick_value=0,
+        click_worth_price=2,
+        autoclick_price=10,
+    )
+    db.session.add(upgrade)
+    db.session.commit()
+    return user
+
+
+def get_upgrades_for_user(user: User) -> Upgrade:
+    """Get the Upgrade row for a user, creating it if missing."""
+    if user.upgrade is None:
+        upgrade = Upgrade(
+            user_id=user.id,
+            click_worth_value=1,
+            autoclick_value=0,
+            click_worth_price=2,
+            autoclick_price=10,
+        )
+        db.session.add(upgrade)
+        db.session.commit()
+        return upgrade
+    return user.upgrade
 
 
 def get_leaderboard():
-    """Return a list of top 10 users by score."""
-    users_folder = 'users'
-    leaderboard = []
-
-    if not os.path.exists(users_folder):
-        return leaderboard  # empty
-
-    for filename in os.listdir(users_folder):
-        # We only want login_save_*.json files
-        if filename.startswith("login_save_") and filename.endswith(".json"):
-            path = os.path.join(users_folder, filename)
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            except Exception:
-                continue  # skip broken files
-
-            username = data.get("username", "Unknown")
-            score = data.get("clicks", 0)
-
-            leaderboard.append({
-                "username": username,
-                "score": score
-            })
-
-    # Sort by score, highest first
-    leaderboard.sort(key=lambda x: x['score'], reverse=True)
-
-    # Return only top 10
-    return leaderboard[:10]
-
-def apply_autoclick(username):
-    """Add autoclick_value to the player's score once."""
-    save = read_save_file(username)
-    upgrades = read_upgrades_func(username)
-
-    if save is None or upgrades is None:
-        return None  # nothing to update
-
-    autoclick_value = upgrades.get('autoclick_value', 0)
-    if autoclick_value <= 0:
-        return save  # user has no autoclickers
-
-    current_score = save.get('clicks', 0)
-    save['clicks'] = current_score + autoclick_value
-
-    write_save_file(username, save)
-    return save
-
-#add the redirect link without the slash
-def check_username(redirect_link):
-    if 'username' in session:
-        username = session['username']
-        return username
-    else:
-        return redirect(url_for(f"{redirect_link}"))
-
-def read_upgrades_func(username):
-    filename = f"{username}_upgrades.json"
-    path = os.path.join('users', filename)
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return None
-
-def read_save_file(username):
-    filename = f"login_save_{username}.json"
-    path = os.path.join('users', filename)
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return None
+    """Return a list of top 10 users by score (clicks)."""
+    top_users = User.query.order_by(User.clicks.desc()).limit(10).all()
+    return [{"username": u.username, "score": u.clicks} for u in top_users]
 
 
-def write_save_file(username, json_data):
-    filename = f"login_save_{username}.json"
-    path = os.path.join('users', filename)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(json_data, f, ensure_ascii=False, indent=4)
-
-def write_upgrades(username, json_data):
-    filename = f"{username}_upgrades.json"
-    path = os.path.join('users', filename)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(json_data, f, ensure_ascii=False, indent=4)
-def autoclick(username):
-    read_save = read_save_file(username)
-    read_upgrades = read_upgrades_func(username)
-    
-    if read_upgrades is None or read_save is None:
-        return
-        
-    autoclick_value = read_upgrades.get('autoclick_value', 0)
-    if autoclick_value <= 0:
-        return
-    current_score = read_save.get('clicks', 0)
-    read_save['clicks'] = current_score + autoclick_value
-
-    write_save_file(username, read_save)
+def apply_autoclick(user: User, upgrade: Upgrade):
+    """
+    Apply autoclick once to the user's score.
+    This is called every time /get_score is polled from the browser.
+    """
+    if upgrade.autoclick_value > 0:
+        user.clicks += upgrade.autoclick_value
+        db.session.commit()
 
 
-@app.route('/', methods=['GET', 'POST'])
+# ---------------------------------------------------
+# Routes
+# ---------------------------------------------------
+@app.route("/", methods=["GET", "POST"])
 def start():
-    if 'username' in session:
-        return redirect(url_for('homepage'))
-    return render_template('start.html')
+    if get_logged_in_user() is not None:
+        return redirect(url_for("homepage"))
+    return render_template("start.html")
 
-@app.route('/sign_up', methods=['GET', 'POST'])
+
+@app.route("/sign_up", methods=["GET", "POST"])
 def submit_form():
-    if 'username' in session:
-        return redirect(url_for('homepage'))
+    if get_logged_in_user() is not None:
+        return redirect(url_for("homepage"))
+
     error_message = ""
     error_message_status = False
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        path = os.path.join("users", f"login_save_{username}.json")
-        if os.path.exists(path):
+
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
+        verify_password = request.form["verify"].strip()
+        email = request.form["email"].strip()
+
+        # Check if user already exists
+        existing_user = get_user_by_username(username)
+        if existing_user:
             error_message = "Username already exists!"
             error_message_status = True
-            return render_template('sign_up.html',
-                                   error_message=error_message,
-                                   error_message_status=error_message_status)
-        else:
-
-            password = request.form['password'].strip()
-            verify_password = request.form['verify'].strip()
-            if password != verify_password:
-                error_message = "Verify password is not the same as password!"
-                error_message_status = True
-                return render_template('sign_up.html',
-                                        error_message_status=error_message_status,
-                                        error_message=error_message)
-            email = request.form['email'].strip()
-            hashed_pw = generate_password_hash(password)
-            login_save = {
-                "username" : username,
-                "password" : hashed_pw,
-                "email" : email,
-                "clicks" : 0
-            }
-            upgrades_save = {
-                "click_worth_value" : 1,
-                "autoclick_value" : 0,
-                "click_worth_price" : 2,
-                "autoclick_price" : 10
-            }
-
-            try:
-                write_save_file(username, login_save)
-                write_upgrades(username, upgrades_save)
-
-            except IOError as e:
-                return "ERROR WITH .JSON"
-            
-            return redirect(url_for('log_in'))
-    return render_template('sign_up.html',
-                            error_message=error_message,
-                            error_message_status=error_message_status,
-                            )
-
-@app.route('/log_in', methods=['GET', 'POST'])
-def log_in():
-    if 'username' in session:
-            return redirect(url_for('homepage'))
-    error_message = ""
-    error_status = False
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password'].strip()
-        email = request.form['email'].strip()
-        read_save = read_save_file(username)
-            
-                
-        password_json = read_save.get("password")
-        email_json = read_save.get("email")
-        if read_save is None:
-            error_status = True
-            error_message = "This user does not exist"
-            return render_template('log_in.html', error_message=error_message, error_status=error_status)
-        elif check_password_hash(password_json, password) and email_json == email:
-            session['username'] = username
-
-            job_id = f"autoclick_{username}"
-            try:
-                scheduler.remove_job(job_id)
-            except Exception:
-                pass
-
-            scheduler.add_job(
-                id=job_id,
-                func=autoclick,
-                args=[username],
-                trigger='interval',
-                seconds=1
+            return render_template(
+                "sign_up.html",
+                error_message=error_message,
+                error_message_status=error_message_status,
             )
 
-            return redirect(url_for('homepage'))
+        if password != verify_password:
+            error_message = "Verify password is not the same as password!"
+            error_message_status = True
+            return render_template(
+                "sign_up.html",
+                error_message_status=error_message_status,
+                error_message=error_message,
+            )
+
+        # Create user in DB
+        try:
+            create_user(username, email, password)
+        except Exception:
+            # In a real app: log the error
+            return "ERROR WITH DATABASE"
+
+        return redirect(url_for("log_in"))
+
+    return render_template(
+        "sign_up.html",
+        error_message=error_message,
+        error_message_status=error_message_status,
+    )
+
+
+@app.route("/log_in", methods=["GET", "POST"])
+def log_in():
+    if get_logged_in_user() is not None:
+        return redirect(url_for("homepage"))
+
+    error_message = ""
+    error_status = False
+
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
+        email = request.form["email"].strip()
+
+        user = get_user_by_username(username)
+
+        if user is None:
+            error_status = True
+            error_message = "This user does not exist"
+            return render_template(
+                "log_in.html",
+                error_message=error_message,
+                error_status=error_status,
+            )
+
+        # Check password + email
+        if check_password_hash(user.password_hash, password) and user.email == email:
+            session["username"] = username
+            return redirect(url_for("homepage"))
         else:
             error_status = True
             error_message = "Incorrect email or password"
 
-    return render_template('log_in.html', error_status=error_status,
-                           error_message=error_message)
+    return render_template(
+        "log_in.html",
+        error_status=error_status,
+        error_message=error_message,
+    )
 
-@app.route('/homepage', methods=['GET', 'POST'])
+
+@app.route("/homepage")
 def homepage():
-    
-    usernameORredirect = check_username('log_in')
-    if not isinstance(usernameORredirect, str):
-        return usernameORredirect
-    username = usernameORredirect
+    user = get_logged_in_user()
+    if user is None:
+        return redirect(url_for("log_in"))
 
-    read_upgrades = read_upgrades_func(username)
-    read_save = read_save_file(username)
-    
+    upgrade = get_upgrades_for_user(user)
 
-    score = read_save.get('clicks')
-    cps = read_upgrades.get('autoclick_value', 0)
-    click_worth = read_upgrades.get('click_worth_value', 1)
+    score = user.clicks
+    cps = upgrade.autoclick_value
+    click_worth = upgrade.click_worth_value
 
-    if request.method == 'POST':
-        if 'cookie' in request.form:
-            score += click_worth
-            new_score = score
-            read_save['clicks'] = new_score
+    return render_template(
+        "homepage.html",
+        score=score,
+        cps=cps,
+        click_worth=click_worth,
+    )
 
-            write_save_file(username, read_save)
 
-        elif 'shop' in request.form:
-            return redirect(url_for('upgrade_shop'))
-        
-        elif 'log_out' in request.form:
-            username = session.get('username')
-
-            if username:
-                job_id = f"autoclick_{username}"
-                try:
-                    scheduler.remove_job(job_id)
-                except Exception:
-                    pass
-
-            session.clear()
-            return redirect(url_for('start'))
-    
-
-    return render_template('homepage.html', score=score, cps=cps, click_worth=click_worth)
-
-@app.route('/upgrade_shop', methods=['GET', 'POST'])
+@app.route("/upgrade_shop", methods=["GET", "POST"])
 def upgrade_shop():
-    if 'username' not in session:
-        return redirect(url_for('start'))
-    
+    user = get_logged_in_user()
+    if user is None:
+        return redirect(url_for("start"))
+
     error_status = False
     error_message = ""
-    username = session['username']
-    read_clicks = read_save_file(username)
-    read_upgrade = read_upgrades_func(username)
 
-    score = read_clicks.get('clicks')
-    autoclick_price = read_upgrade.get('autoclick_price', 10)
-    click_worth_price = read_upgrade.get('click_worth_price', 2)
-    autoclick_value = read_upgrade.get('autoclick_value', 0)
-    click_worth_value = read_upgrade.get('click_worth_value', 1)
+    upgrade = get_upgrades_for_user(user)
+
+    score = user.clicks
+    autoclick_price = upgrade.autoclick_price
+    click_worth_price = upgrade.click_worth_price
+    autoclick_value = upgrade.autoclick_value
+    click_worth_value = upgrade.click_worth_value
+
     price_mult = 1.5
-    if request.method == 'POST':
-        if 'buy_autoclick' in request.form:
+
+    if request.method == "POST":
+        if "buy_autoclick" in request.form:
             if score >= autoclick_price:
                 score -= autoclick_price
-                new_score1 = score
-                read_clicks['clicks'] = new_score1
+                user.clicks = score
 
-                autoclick_price = int(price_mult * autoclick_price)
-                new_autoclick_price = autoclick_price
-                read_upgrade['autoclick_price'] = new_autoclick_price
+                upgrade.autoclick_price = int(price_mult * autoclick_price)
+                upgrade.autoclick_value = autoclick_value + 1
 
-                autoclick_value += 1
-                new_autoclick_value = autoclick_value
-                read_upgrade['autoclick_value'] = new_autoclick_value
-                
-                
-                write_upgrades(username, read_upgrade)
-
-                write_save_file(username, read_clicks)
-                
+                db.session.commit()
             else:
                 error_status = True
-                error_message = 'You dont have enough score to buy this item'
+                error_message = "You dont have enough score to buy this item"
 
-        elif 'buy_click_worth' in request.form:
+        elif "buy_click_worth" in request.form:
             if score >= click_worth_price:
-
                 score -= click_worth_price
-                new_score2 = score
-                read_clicks['clicks'] = new_score2
+                user.clicks = score
 
-                click_worth_price = int(price_mult * click_worth_price)
-                new_click_worth_price = click_worth_price
-                read_upgrade['click_worth_price'] = new_click_worth_price
+                upgrade.click_worth_price = int(price_mult * click_worth_price)
+                upgrade.click_worth_value = click_worth_value + 1
 
-                click_worth_value += 1
-                new_click_worth_value = click_worth_value
-                read_upgrade['click_worth_value'] = new_click_worth_value
-                
-                write_upgrades(username, read_upgrade)
-
-                write_save_file(username, read_clicks)
+                db.session.commit()
             else:
                 error_status = True
-                error_message = 'You dont have enough score to buy this item'
+                error_message = "You dont have enough score to buy this item"
 
-    return render_template('upgrade_shop.html',
-                            autoclick_price=autoclick_price,
-                            click_worth_price=click_worth_price,
-                            score=score,
-                            error_message=error_message,
-                            error_status=error_status)
+        # Refresh DB values after changes
+        db.session.refresh(user)
+        db.session.refresh(upgrade)
+        score = user.clicks
+        autoclick_price = upgrade.autoclick_price
+        click_worth_price = upgrade.click_worth_price
+        autoclick_value = upgrade.autoclick_value
+        click_worth_value = upgrade.click_worth_value
 
-@app.route('/get_score')
+    return render_template(
+        "upgrade_shop.html",
+        autoclick_price=autoclick_price,
+        click_worth_price=click_worth_price,
+        score=score,
+        error_message=error_message,
+        error_status=error_status,
+    )
+
+
+@app.route("/click", methods=["POST"])
+def click():
+    """
+    Handle one manual cookie click without reloading the page.
+    """
+    user = get_logged_in_user()
+    if user is None:
+        return {"score": 0}, 401
+
+    upgrade = get_upgrades_for_user(user)
+    user.clicks += upgrade.click_worth_value
+    db.session.commit()
+
+    return {"score": user.clicks}
+
+
+@app.route("/get_score")
 def get_score():
-    username = session.get('username')
-    if not username:
+    """
+    Called every second by JS to:
+    - apply autoclick once
+    - return current score, cps, click_worth
+    """
+    user = get_logged_in_user()
+    if user is None:
         return {"score": 0, "cps": 0, "click_worth": 1}
 
-    save = apply_autoclick(username)
-    upgrades = read_upgrades_func(username)
+    upgrade = get_upgrades_for_user(user)
 
-    if save is None or upgrades is None:
-        return {"score": 0, "cps": 0, "click_worth": 1}
+    # Apply autoclick once per poll
+    apply_autoclick(user, upgrade)
 
     return {
-        "score": save.get("clicks", 0),
-        "cps": upgrades.get("autoclick_value", 0),
-        "click_worth": upgrades.get("click_worth_value", 1)
+        "score": user.clicks,
+        "cps": upgrade.autoclick_value,
+        "click_worth": upgrade.click_worth_value,
     }
 
-@app.route('/logout')
+
+@app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for('start'))
+    return redirect(url_for("start"))
 
-@app.route('/get_leaderboard')
+
+@app.route("/get_leaderboard")
 def get_leaderboard_route():
     top_players = get_leaderboard()
     return {"players": top_players}
 
-if __name__ == '__main__':
+
+# ---------------------------------------------------
+# Main
+# ---------------------------------------------------
+if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)

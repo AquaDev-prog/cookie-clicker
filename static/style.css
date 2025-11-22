@@ -14,6 +14,7 @@ body {
     color: #333;
 }
 
+
 /* ===========================
      TOP SCORE + HEADER TEXT
    =========================== */
@@ -153,7 +154,7 @@ form button {
     padding: 10px 20px;
     font-size: 18px;
     background-color: transparent;
-    color: white;
+    color: black;
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -178,5 +179,8 @@ form button:active {
       BACKGROUND LAYOUT FIX
    =========================== */
 html, body {
+    margin: 0;
+    padding: 0;
     height: 100%;
+    overflow: hidden;
 }

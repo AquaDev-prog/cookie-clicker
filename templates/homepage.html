@@ -13,6 +13,10 @@
         Score: {{ score }}
     </h1>
 
+    <!-- CPS + Click worth (optional display) -->
+    <p id="cpsDisplay">CPS: {{ cps }}</p>
+    <p id="clickWorthDisplay">Click Worth: {{ click_worth }}</p>
+
     <!-- Top-right buttons -->
     <div style="position: absolute; top: 20px; right: 20px;">
         <a href="{{ url_for('upgrade_shop') }}">
@@ -23,31 +27,61 @@
             <button class="logout-button">Logout</button>
         </a>
     </div>
-    <div id="leaderboardBox">
+
+    <!-- Leaderboard -->
+    <div id="leaderboardBox" style="position: absolute; top: 160px; left: 20px; text-align:left;">
         <h3>Top Players</h3>
         <ul id="leaderboardList"></ul>
     </div>
+
     <!-- Big cookie center -->
     <div style="display: flex; align-items: center; justify-content: center; height: 100vh;">
-        <form method="POST">
-            <button class="cookie-button" type="submit" name="cookie"></button>
-        </form>
+        <button class="cookie-button" id="cookieBtn"></button>
     </div>
 
-    <!-- Auto-refresh score via JS -->
+    <!-- JS: handle manual click without reload -->
     <script>
-    setInterval(() => {
-        fetch('/get_score')
+    document.getElementById("cookieBtn").addEventListener("click", () => {
+        fetch("/click", { method: "POST" })
             .then(response => response.json())
             .then(data => {
-                const scoreEl = document.getElementById('scoreDisplay');
+                const scoreEl = document.getElementById("scoreDisplay");
                 if (scoreEl) {
                     scoreEl.innerText = "Score: " + data.score;
                 }
             })
-            .catch(err => console.error('Error fetching score:', err));
-    }, 1000);
+            .catch(err => console.error("Error clicking cookie:", err));
+    });
     </script>
+
+    <!-- Auto-refresh score via JS (also applies autoclick) -->
+    <script>
+    function refreshScore() {
+        fetch("/get_score")
+            .then(response => response.json())
+            .then(data => {
+                const scoreEl = document.getElementById('scoreDisplay');
+                const cpsEl = document.getElementById('cpsDisplay');
+                const cwEl = document.getElementById('clickWorthDisplay');
+
+                if (scoreEl) {
+                    scoreEl.innerText = "Score: " + data.score;
+                }
+                if (cpsEl) {
+                    cpsEl.innerText = "CPS: " + data.cps;
+                }
+                if (cwEl) {
+                    cwEl.innerText = "Click Worth: " + data.click_worth;
+                }
+            })
+            .catch(err => console.error('Error fetching score:', err));
+    }
+
+    setInterval(refreshScore, 1000);
+    refreshScore();
+    </script>
+
+    <!-- Leaderboard JS -->
     <script>
     function updateLeaderboard() {
         fetch('/get_leaderboard')
@@ -68,5 +102,7 @@
     updateLeaderboard();
     </script>
 
+</body>
+</html>
 </body>
 </html>
